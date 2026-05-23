@@ -1,0 +1,24 @@
+# Ignore the .env file which contains sensitive information
+.env
+
+# Ignore other config files
+setup.cfg
+
+
+# Ignore log files
+*.log
+
+# Default ignored files
+/shelf/
+/workspace.xml
+
+# Ignore migration files
+migrations/
+
+# Ignore compiled Python files
+__pycache__/
+
+# Ignore other files
+Redoc.yaml
+frontend_wireframe.html
+PROFILE.ps1
