@@ -7,8 +7,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from drf_spectacular.utils import extend_schema, inline_serializer, OpenApiResponse
-from .serializers import UserSerializer
-from django.contrib.auth import authenticate, login, logout
+from .serializers import UserSerializer, PasswordResetConfirmSerializer
+from django.contrib.auth import authenticate, logout
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.utils.http import urlsafe_base64_decode
@@ -139,19 +139,23 @@ class UserRegistrationView(generics.CreateAPIView):
 @swagger_auto_schema(tags=['Accounts'])
 class UserLoginView(generics.GenericAPIView):
     """API view for user login."""
-    serializer_class = UserSerializer
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
-        """Authenticate user and create session."""
+        """Authenticate user and return JWT tokens."""
         username = request.data.get('username')
         password = request.data.get('password')
         user = authenticate(request, username=username, password=password)
         if user is not None:
             if not user.is_active:
                 return Response({'error': 'Account is inactive. Please verify your email.'}, status=status.HTTP_403_FORBIDDEN)
-            login(request, user)
-            return Response({'message': 'Login successful'}, status=status.HTTP_200_OK)
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
+                'role': user.role,
+            }, status=status.HTTP_200_OK)
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
 
@@ -194,13 +198,27 @@ class EmailVerificationView(generics.GenericAPIView):
         return Response({'message': 'Email verified successfully'}, status=status.HTTP_200_OK)
 
 
-@swagger_auto_schema(tags=['Accounts'])
+@extend_schema(
+    tags=['Authentication'],
+    summary='Resend email verification link',
+    request=inline_serializer(
+        name='ResendVerificationBody',
+        fields={'email': drf_serializers.EmailField()},
+    ),
+    responses={
+        200: inline_serializer(
+            name='ResendVerificationResponse',
+            fields={'message': drf_serializers.CharField()},
+        ),
+        400: OpenApiResponse(description='Invalid email or account already active'),
+    },
+    auth=[],
+)
 class EmailVerificationConfirmView(generics.GenericAPIView):
-    """API view for confirming email verification."""
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
-        """Resend verification email if token is expired or not used."""
         email = request.data.get('email')
         user = User.objects.filter(email=email).first()
         if user and not user.is_active:
@@ -209,13 +227,24 @@ class EmailVerificationConfirmView(generics.GenericAPIView):
         return Response({'error': 'Invalid email or account already active.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@swagger_auto_schema(tags=['Accounts'])
+@extend_schema(
+    tags=['Authentication'],
+    summary='Request a password reset email',
+    request=inline_serializer(
+        name='PasswordResetRequestBody',
+        fields={'email': drf_serializers.EmailField()},
+    ),
+    responses={200: inline_serializer(
+        name='PasswordResetRequestResponse',
+        fields={'message': drf_serializers.CharField()},
+    )},
+    auth=[],
+)
 class PasswordResetRequestView(generics.GenericAPIView):
-    """API view for requesting a password reset."""
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
-        """Generate password reset token and send email."""
         email = request.data.get('email')
         user = User.objects.filter(email=email).first()
         if user:
@@ -223,16 +252,45 @@ class PasswordResetRequestView(generics.GenericAPIView):
         return Response({'message': 'If an account with that email exists, a password reset link has been sent.'}, status=status.HTTP_200_OK)
 
 
-@swagger_auto_schema(tags=['Accounts'])
+@extend_schema(
+    tags=['Authentication'],
+    summary='Confirm password reset with uid, token and new password',
+    methods=['GET', 'POST'],
+)
 class PasswordResetConfirmView(generics.GenericAPIView):
-    """API view for confirming password reset."""
+    authentication_classes = []
     permission_classes = [AllowAny]
+    serializer_class = PasswordResetConfirmSerializer
 
-    def post(self, request, *args, **kwargs):
-        """Reset password using token."""
-        uid = request.data.get('uid')
-        token = request.data.get('token')
-        new_password = request.data.get('new_password')
+    def get_serializer(self, *args, **kwargs):
+        kwargs.setdefault('initial', {
+            'uid': self.request.query_params.get('uid', ''),
+            'token': self.request.query_params.get('token', ''),
+        })
+        return super().get_serializer(*args, **kwargs)
+
+    @extend_schema(
+        summary='Validate password reset token (called when user clicks email link)',
+        parameters=[
+            drf_serializers.CharField(label='uid'),
+            drf_serializers.CharField(label='token'),
+        ],
+        responses={
+            200: inline_serializer(
+                name='PasswordResetTokenValidResponse',
+                fields={
+                    'uid': drf_serializers.CharField(),
+                    'token': drf_serializers.CharField(),
+                    'message': drf_serializers.CharField(),
+                },
+            ),
+            400: OpenApiResponse(description='Invalid or expired token'),
+        },
+        auth=[],
+    )
+    def get(self, request, *args, **kwargs):
+        uid = request.query_params.get('uid')
+        token = request.query_params.get('token')
         if not uid or not token:
             return Response({'error': 'Missing uid or token.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -242,8 +300,55 @@ class PasswordResetConfirmView(generics.GenericAPIView):
         except Exception:
             return Response({'error': 'Invalid uid.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        generator = PasswordResetTokenGenerator()
-        if not generator.check_token(user, token):
+        if not PasswordResetTokenGenerator().check_token(user, token):
+            return Response({'error': 'Invalid or expired token.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            'uid': uid,
+            'token': token,
+            'message': 'Token is valid. Submit uid, token and new_password via POST to reset your password.',
+        }, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        summary='Set new password using uid and token',
+        request=inline_serializer(
+            name='PasswordResetConfirmBody',
+            fields={
+                'uid': drf_serializers.CharField(),
+                'token': drf_serializers.CharField(),
+                'new_password': drf_serializers.CharField(),
+            },
+        ),
+        responses={
+            200: inline_serializer(
+                name='PasswordResetConfirmResponse',
+                fields={'message': drf_serializers.CharField()},
+            ),
+            400: OpenApiResponse(description='Invalid or expired token'),
+        },
+        auth=[],
+    )
+    def post(self, request, *args, **kwargs):
+        data = {
+            'uid': request.data.get('uid') or request.query_params.get('uid', ''),
+            'token': request.data.get('token') or request.query_params.get('token', ''),
+            'new_password': request.data.get('new_password', ''),
+        }
+        serializer = self.get_serializer(data=data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        uid = serializer.validated_data['uid']
+        token = serializer.validated_data['token']
+        new_password = serializer.validated_data['new_password']
+
+        try:
+            uid_decoded = force_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(pk=uid_decoded)
+        except Exception:
+            return Response({'error': 'Invalid uid.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not PasswordResetTokenGenerator().check_token(user, token):
             return Response({'error': 'Invalid or expired token.'}, status=status.HTTP_400_BAD_REQUEST)
 
         user.set_password(new_password)

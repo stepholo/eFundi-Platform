@@ -127,3 +127,18 @@ class UserDetailSerializer(UserSerializer):
     class Meta(UserSerializer.Meta):
         fields = UserSerializer.Meta.fields + ('verified_email', 'is_active', 'is_staff', 'last_login')
         read_only_fields = UserSerializer.Meta.read_only_fields + ('verified_email', 'is_active', 'is_staff', 'last_login')
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True)
+
+    def validate_new_password(self, value: str) -> str:
+        validators = [
+            UserAttributeSimilarityValidator(),
+            MinimumLengthValidator(),
+            CommonPasswordValidator(),
+        ]
+        validate_password(value, password_validators=validators)
+        return value
