@@ -39,13 +39,12 @@ class UserSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        """Override create method to hash the password before saving."""
         password = validated_data.pop('password', None)
         validated_data.pop('password2', None)
-        user = super().create(validated_data)
+        user = User(**validated_data)
         if password:
             user.set_password(password)
-            user.save()
+        user.save()
         return user
 
     def validate_username(self, value: str) -> str:
