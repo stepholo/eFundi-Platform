@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import sys
+from decimal import Decimal
 from pathlib import Path
 from datetime import timedelta
 import environ
@@ -42,6 +44,11 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 if _NGROK_HOST:
     ALLOWED_HOSTS.append(_NGROK_HOST)
 
+# Base URL used to build absolute links in emails when there is no HTTP request
+# context (e.g. signals, Celery tasks, admin-triggered emails).
+# Override in .env for staging/production.
+SITE_URL = _NGROK_URL or env('SITE_URL', default='http://localhost:8000')
+
 
 # Application definition
 
@@ -65,7 +72,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'drf_spectacular',
 
-    'accounts',
+    'accounts.app.AccountsConfig',
     'bookings.app.BookingsConfig',
     'common.app.CommonConfig',
     'customers.app.CustomersConfig',
@@ -345,17 +352,18 @@ if _NGROK_URL:
     CSRF_TRUSTED_ORIGINS.append(_NGROK_URL.rstrip('/'))
 
 # BUSINESS RULES
-from decimal import Decimal
-COMMISSION_RATE = Decimal('0.20')   # 20% platform fee retained from each payment
-MINIMUM_WITHDRAWAL = Decimal('250') # Minimum technician withdrawal in KSh
+COMMISSION_RATE = Decimal('0.20')           # 20% platform fee retained from each payment
+MINIMUM_WITHDRAWAL = Decimal('5')          # Minimum manual withdrawal amount in KSh
+AUTO_WITHDRAWAL_THRESHOLD = Decimal('200') # Auto-payout triggered when wallet balance >= this
 
-# M-PESA (Daraja) SETTINGS
-MPESA_CONSUMER_KEY = env('MPESA_CONSUMER_KEY', default='')
-MPESA_CONSUMER_SECRET = env('MPESA_CONSUMER_SECRET', default='')
-MPESA_BUSINESS_SHORT_CODE = env('MPESA_SHORTCODE', default='174379')
-MPESA_PASSKEY = env('MPESA_PASSKEY', default='')
-MPESA_CALLBACK_URL = env('MPESA_CALLBACK_URL', default='')
-MPESA_ENVIRONMENT = env('MPESA_ENVIRONMENT', default='sandbox')
+# INTASEND PAYMENT GATEWAY
+# Dashboard: https://sandbox.intasend.com  (test)  |  https://app.intasend.com  (live)
+# Webhook URLs to register in Intasend dashboard → Settings → Webhooks:
+#   STK Push result  : <SITE_URL>/api/v1/payments/intasend/callback/
+#   Send Money result: <SITE_URL>/api/v1/payments/intasend/payout/callback/
+INTASEND_PUBLISHABLE_KEY = env('INTASEND_PUBLISHABLE_KEY', default='')
+INTASEND_API_KEY = env('INTASEND_API_KEY', default='')
+INTASEND_TEST_MODE = env.bool('INTASEND_TEST_MODE', default=False)
 
 # SWAGGER SETTINGS
 SWAGGER_SETTINGS = {
@@ -429,7 +437,6 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 # Use 'solo' pool on Windows (prefork uses Unix semaphores which Windows denies).
 # On Linux/Mac in production, remove this line to use the default prefork pool.
-import sys
 if sys.platform == 'win32':
     CELERY_WORKER_POOL = 'solo'
 
