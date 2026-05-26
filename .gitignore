@@ -25,6 +25,7 @@ media/
 */migrations/*.py
 */migrations/__pycache__/
 !*/migrations/__init__.py
+migrations/
 
 # IDE / tools
 .idea/
