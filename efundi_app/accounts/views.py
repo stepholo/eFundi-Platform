@@ -132,8 +132,7 @@ class UserRegistrationView(generics.CreateAPIView):
     permission_classes = [AllowAny]
 
     def perform_create(self, serializer):
-        user = serializer.save()
-        send_verification_email(user, self.request)
+        serializer.save()
 
 
 @swagger_auto_schema(tags=['Accounts'])
@@ -149,7 +148,10 @@ class UserLoginView(generics.GenericAPIView):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             if not user.is_active:
-                return Response({'error': 'Account is inactive. Please verify your email.'}, status=status.HTTP_403_FORBIDDEN)
+                return Response(
+                    {'error': 'Account is inactive. Please verify your email.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             refresh = RefreshToken.for_user(user)
             return Response({
                 'access': str(refresh.access_token),
@@ -195,6 +197,19 @@ class EmailVerificationView(generics.GenericAPIView):
         user.is_active = True
         user.verified_email = True
         user.save()
+
+        if user.role == 'Technician':
+            from utils.emails import send_notification_email
+            send_notification_email(
+                to_email=user.email,
+                subject='Your eFundi technician account is pending verification',
+                template_name='emails/account_pending.html',
+                context={
+                    'first_name': user.first_name,
+                    'verification_status': 'Pending',
+                },
+            )
+
         return Response({'message': 'Email verified successfully'}, status=status.HTTP_200_OK)
 
 
@@ -223,8 +238,14 @@ class EmailVerificationConfirmView(generics.GenericAPIView):
         user = User.objects.filter(email=email).first()
         if user and not user.is_active:
             send_verification_email(user, request)
-            return Response({'message': 'Verification email resent. Please check your inbox.'}, status=status.HTTP_200_OK)
-        return Response({'error': 'Invalid email or account already active.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'message': 'Verification email resent. Please check your inbox.'},
+                status=status.HTTP_200_OK,
+            )
+        return Response(
+            {'error': 'Invalid email or account already active.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
 
 @extend_schema(
@@ -249,7 +270,10 @@ class PasswordResetRequestView(generics.GenericAPIView):
         user = User.objects.filter(email=email).first()
         if user:
             send_password_reset_email(user, request)
-        return Response({'message': 'If an account with that email exists, a password reset link has been sent.'}, status=status.HTTP_200_OK)
+        return Response(
+            {'message': 'If an account with that email exists, a password reset link has been sent.'},
+            status=status.HTTP_200_OK,
+        )
 
 
 @extend_schema(
