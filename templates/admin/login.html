@@ -1,0 +1,19 @@
+{% extends "admin/base_site.html" %}
+{% load i18n socialaccount %}
+
+{% block content %}
+  <div style="margin-bottom:1rem;">
+    <a class="button" href="{% provider_login_url 'google' %}">Sign in with Google</a>
+  </div>
+
+  <h2>{% trans "Administrator login" %}</h2>
+
+  <form method="post" action="{% url 'admin:login' %}">{% csrf_token %}
+    {{ form.as_p }}
+    <div>
+      <input type="submit" value="{% trans 'Log in' %}" />
+      <input type="hidden" name="next" value="{{ next }}" />
+    </div>
+  </form>
+
+{% endblock %}
