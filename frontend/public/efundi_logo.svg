@@ -1,0 +1,88 @@
+<svg width="340" height="88" viewBox="0 0 340 88" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="eFundi Logo">
+  <defs>
+    <linearGradient id="pinGrad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF9A3C"/>
+      <stop offset="100%" style="stop-color:#E8501A"/>
+    </linearGradient>
+    <linearGradient id="shadowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#C43D0F;stop-opacity:0.3"/>
+      <stop offset="100%" style="stop-color:#C43D0F;stop-opacity:0"/>
+    </linearGradient>
+    <filter id="pinShadow" x="-20%" y="-10%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#C43D0F" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- ═══════════════ ICON MARK ═══════════════ -->
+  <!-- Location pin body -->
+  <path d="
+    M 38 5
+    C 24 5, 13 16, 13 30
+    C 13 44, 25 56, 36 64
+    L 38 68
+    L 40 64
+    C 51 56, 63 44, 63 30
+    C 63 16, 52 5, 38 5 Z
+  " fill="url(#pinGrad)" filter="url(#pinShadow)"/>
+
+  <!-- Inner circle highlight -->
+  <circle cx="38" cy="29" r="14" fill="white" opacity="0.18"/>
+
+  <!-- Wrench icon (white, inside pin) — scaled to ~20×20, centered at 38,29 -->
+  <g transform="translate(27.5, 18.5) scale(0.87)">
+    <!-- Material-style open-end wrench path (24×24 viewbox) -->
+    <path d="
+      M15.5 2
+      C 13 2, 11 4, 11 6.5
+      C 11 7, 11.1 7.5, 11.3 7.9
+      L 2.3 16.9
+      C 2.1 17.1, 2 17.5, 2 18
+      C 2 19.1, 2.9 20, 4 20
+      C 4.5 20, 4.8 19.9, 5.1 19.7
+      L 14.1 10.7
+      C 14.5 10.9, 15 11, 15.5 11
+      C 18 11, 20 9, 20 6.5
+      C 20 6, 19.9 5.5, 19.7 5.1
+      L 17 7.8
+      L 15 7.2
+      L 14.4 5.2
+      L 17.1 2.5
+      C 16.6 2.2, 16.1 2, 15.5 2 Z
+    " fill="white" stroke="white" stroke-width="0.3" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Pin bottom dot (shadow/depth) -->
+  <ellipse cx="38" cy="74" rx="7" ry="2.5" fill="#C43D0F" opacity="0.18"/>
+
+
+  <!-- ═══════════════ WORDMARK ═══════════════ -->
+  <!-- "e" in orange -->
+  <text
+    x="77" y="47"
+    font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+    font-weight="800"
+    font-size="42"
+    fill="#E8501A"
+    letter-spacing="-1">e</text>
+
+  <!-- "Fundi" in deep navy -->
+  <text
+    x="105" y="47"
+    font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+    font-weight="800"
+    font-size="42"
+    fill="#1B2D5E"
+    letter-spacing="-1">Fundi</text>
+
+  <!-- Tagline -->
+  <text
+    x="78" y="64"
+    font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+    font-weight="400"
+    font-size="12.5"
+    fill="#64748B"
+    letter-spacing="1.8">YOUR FUNDI, ON DEMAND</text>
+
+  <!-- Thin accent line under wordmark -->
+  <line x1="78" y1="68" x2="270" y2="68" stroke="#E8501A" stroke-width="1.5" opacity="0.25"/>
+</svg>
